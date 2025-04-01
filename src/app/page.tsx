@@ -6,8 +6,9 @@ import {
   User,
   signOut,
   signInWithEmailAndPassword,
-  signInWithCustomToken,
   AuthError,
+  signInWithCredential,
+  GoogleAuthProvider,
 } from 'firebase/auth';
 import { auth } from './firebase';
 
@@ -15,6 +16,7 @@ export default function Home() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [tokenDebug, setTokenDebug] = useState<string>('');
 
   // Primary Auth: Listen for auth state changes
   useEffect(() => {
@@ -22,26 +24,36 @@ export default function Home() {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setUser(user);
       setLoading(false);
-      console.log(user ? 'User is signed in' : 'User is signed out');
+      if (user) {
+        console.log('User signed in:', {
+          email: user.email,
+          displayName: user.displayName,
+          photoURL: user.photoURL,
+        });
+      } else {
+        console.log('User signed out');
+      }
     });
 
     return () => unsubscribe();
   }, []);
 
-  // Primary Auth: Custom Token Authentication
+  // Primary Auth: Token Authentication
   useEffect(() => {
     const token = localStorage.getItem('authToken');
-    console.log('Checking for custom token in localStorage...', token);
     if (token) {
-      console.log('Custom token found, attempting to authenticate...', token);
-      authenticateWithFirebase(token);
+      console.log('Found token in localStorage, attempting authentication...');
+      setTokenDebug(token);
+      authenticateWithToken(token);
     }
 
     // Listen for token updates
     const handleTokenUpdate = () => {
       const newToken = localStorage.getItem('authToken');
       if (newToken) {
-        authenticateWithFirebase(newToken);
+        console.log('Token updated in localStorage, re-authenticating...');
+        setTokenDebug(newToken);
+        authenticateWithToken(newToken);
       }
     };
 
@@ -51,15 +63,58 @@ export default function Home() {
     };
   }, []);
 
-  // Primary Auth: Custom Token Authentication Function
-  async function authenticateWithFirebase(token: string) {
+  // Primary Auth: Token Authentication Function
+  async function authenticateWithToken(token: string) {
     try {
       setError(null);
-      await signInWithCustomToken(auth, token);
-      console.log('User signed in successfully with custom token!');
+      console.log('Starting authentication process...');
+
+      // Decode and analyze token
+      const tokenParts = token.split('.');
+      if (tokenParts.length !== 3) {
+        throw new Error('Invalid token format');
+      }
+
+      const payload = JSON.parse(atob(tokenParts[1]));
+      console.log('Token payload:', {
+        iss: payload.iss,
+        provider: payload.firebase?.sign_in_provider,
+        exp: new Date(payload.exp * 1000).toLocaleString(),
+      });
+
+      // ID Token authentication
+      const credential = GoogleAuthProvider.credential(token);
+      const result = await signInWithCredential(auth, credential);
+      console.log('Authentication successful:', {
+        email: result.user.email,
+        name: result.user.displayName,
+        provider: result.user.providerData[0]?.providerId,
+      });
     } catch (error) {
-      console.error('Firebase custom token authentication failed:', error);
-      setError('Custom token authentication failed. Please try again.');
+      console.error('Authentication failed:', error);
+
+      // Enhanced error reporting
+      if (error instanceof Error) {
+        console.error('Error details:', {
+          name: error.name,
+          message: error.message,
+          code: (error as AuthError).code,
+          stack: error.stack,
+        });
+
+        // User-friendly error message based on error type
+        if ((error as AuthError).code === 'auth/id-token-expired') {
+          setError(
+            'The authentication token has expired. Please log in again.'
+          );
+        } else if ((error as AuthError).code === 'auth/invalid-credential') {
+          setError('Invalid authentication credentials. Please try again.');
+        } else {
+          setError(error.message);
+        }
+      } else {
+        setError('An unknown error occurred');
+      }
     }
   }
 
@@ -89,8 +144,9 @@ export default function Home() {
   const handleLogout = async () => {
     try {
       await signOut(auth);
-      localStorage.removeItem('authToken'); // Clear stored token
-      console.log('Signed out successfully');
+      localStorage.removeItem('authToken');
+      setTokenDebug('');
+      console.log('Logged out successfully');
     } catch (error) {
       const authError = error as AuthError;
       console.error('Sign out failed:', authError);
@@ -115,11 +171,32 @@ export default function Home() {
 
         {/* Primary Authentication Status */}
         <div className="mb-6 text-center">
-          <h2 className="text-lg font-semibold mb-2">Primary Auth Status</h2>
+          <h2 className="text-lg font-semibold mb-2">Authentication Status</h2>
           {user ? (
-            <div className="p-4 bg-green-100 rounded-lg">
-              <p className="text-green-700">Logged in as: {user.email}</p>
-              <p className="text-sm text-green-600 mt-1">UID: {user.uid}</p>
+            <div className="space-y-4">
+              <div className="p-4 bg-green-100 rounded-lg">
+                <div className="flex items-center justify-center gap-3">
+                  {user.photoURL && (
+                    <img
+                      src={user.photoURL}
+                      alt="Profile"
+                      className="w-10 h-10 rounded-full"
+                    />
+                  )}
+                  <div className="text-left">
+                    {user.displayName && (
+                      <p className="font-medium text-green-700">
+                        {user.displayName}
+                      </p>
+                    )}
+                    <p className="text-sm text-green-600">{user.email}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="text-sm text-gray-500">
+                <p>UID: {user.uid}</p>
+                <p>Provider: {user.providerData[0]?.providerId}</p>
+              </div>
             </div>
           ) : (
             <div className="p-4 bg-yellow-50 rounded-lg">
@@ -131,11 +208,8 @@ export default function Home() {
           )}
         </div>
 
-        {/* Test Controls */}
+        {/* Action Buttons */}
         <div className="border-t pt-6">
-          <h2 className="text-lg font-semibold mb-4 text-center">
-            Test Controls
-          </h2>
           <div className="flex justify-center space-x-4">
             <button
               onClick={handleTestLogin}
@@ -168,12 +242,55 @@ export default function Home() {
 
         {/* Debug Info */}
         <div className="mt-6 p-4 bg-gray-50 rounded-lg text-xs text-gray-500">
-          <p>
-            Auth Method:{' '}
-            {localStorage.getItem('authToken') ? 'Custom Token' : 'Test Login'}
-          </p>
           <p>Auth State: {user ? 'Authenticated' : 'Not Authenticated'}</p>
           <p>Loading: {loading ? 'True' : 'False'}</p>
+          {tokenDebug && (
+            <details className="mt-2" open>
+              <summary className="font-semibold cursor-pointer">
+                Token Info
+              </summary>
+              <div className="mt-2 space-y-1 p-2 bg-gray-100 rounded">
+                <p>
+                  Type:{' '}
+                  {(() => {
+                    try {
+                      const payload = JSON.parse(
+                        atob(tokenDebug.split('.')[1])
+                      );
+                      return `${
+                        payload.firebase ? 'Firebase' : 'Custom'
+                      } ID Token`;
+                    } catch {
+                      return 'Invalid Token';
+                    }
+                  })()}
+                </p>
+                {(() => {
+                  try {
+                    const payload = JSON.parse(atob(tokenDebug.split('.')[1]));
+                    return (
+                      <>
+                        <p>Email: {payload.email || 'N/A'}</p>
+                        <p>
+                          Provider:{' '}
+                          {payload.firebase?.sign_in_provider || 'N/A'}
+                        </p>
+                        <p>
+                          Expires:{' '}
+                          {new Date(payload.exp * 1000).toLocaleString()}
+                        </p>
+                        <p>Issuer: {payload.iss}</p>
+                      </>
+                    );
+                  } catch {
+                    return (
+                      <p className="text-red-500">Unable to decode token</p>
+                    );
+                  }
+                })()}
+              </div>
+            </details>
+          )}
         </div>
       </div>
     </div>
