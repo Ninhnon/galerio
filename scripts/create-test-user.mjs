@@ -38,5 +38,5 @@ async function createTestUser() {
         }
     }
 }
-
+console.log('Creating test user...');
 createTestUser();
