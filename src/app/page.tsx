@@ -31,7 +31,9 @@ export default function Home() {
   // Primary Auth: Custom Token Authentication
   useEffect(() => {
     const token = localStorage.getItem('authToken');
+    console.log('Checking for custom token in localStorage...', token);
     if (token) {
+      console.log('Custom token found, attempting to authenticate...', token);
       authenticateWithFirebase(token);
     }
 
