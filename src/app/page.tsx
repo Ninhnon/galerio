@@ -68,21 +68,13 @@ export default function Home() {
     try {
       setError(null);
       console.log('Starting authentication process...');
+      setTokenDebug(token);
 
-      // Decode and analyze token
-      const tokenParts = token.split('.');
-      if (tokenParts.length !== 3) {
-        throw new Error('Invalid token format');
+      if (!token) {
+        throw new Error('No authentication token provided');
       }
 
-      const payload = JSON.parse(atob(tokenParts[1]));
-      console.log('Token payload:', {
-        iss: payload.iss,
-        provider: payload.firebase?.sign_in_provider,
-        exp: new Date(payload.exp * 1000).toLocaleString(),
-      });
-
-      // ID Token authentication
+      // Create Google credential with ID token
       const credential = GoogleAuthProvider.credential(token);
       const result = await signInWithCredential(auth, credential);
       console.log('Authentication successful:', {
