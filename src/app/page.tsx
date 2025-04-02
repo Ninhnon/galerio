@@ -5,8 +5,8 @@ import {
   onAuthStateChanged,
   User,
   signOut,
-  signInWithEmailAndPassword,
   AuthError,
+  signInWithPopup,
   signInWithCredential,
   GoogleAuthProvider,
 } from 'firebase/auth';
@@ -63,29 +63,55 @@ export default function Home() {
     };
   }, []);
 
+  // Google Sign In Handler
+  const handleGoogleSignIn = async () => {
+    try {
+      setError(null);
+      setLoading(true);
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      const token = await result.user.getIdToken();
+      localStorage.setItem('authToken', token);
+      setTokenDebug(token);
+      console.log('Google sign in successful');
+    } catch (error) {
+      console.error('Google sign in failed:', error);
+      setError((error as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Primary Auth: Token Authentication Function
-  async function authenticateWithToken(token: string) {
+  async function authenticateWithToken(idToken: string) {
     try {
       setError(null);
       console.log('Starting authentication process...');
-      setTokenDebug(token);
+      setTokenDebug(idToken);
 
-      if (!token) {
+      if (!idToken) {
         throw new Error('No authentication token provided');
       }
 
-      // Create Google credential with ID token
-      // Note that this is a Google ID token, not a Firebase ID token
-      const credential = GoogleAuthProvider.credential(null, token); // For Google token
-      // OR if you specifically need to use an ID token:
-      // const credential = GoogleAuthProvider.credential(token);
+      const accessToken = localStorage.getItem('googleAccessToken');
+      if (!accessToken) {
+        throw new Error('No access token provided');
+      }
 
+      // Create credential with both tokens
+      const credential = GoogleAuthProvider.credential(idToken, accessToken);
       const result = await signInWithCredential(auth, credential);
+
       console.log('Authentication successful:', {
+        uid: result.user.uid,
         email: result.user.email,
         name: result.user.displayName,
         provider: result.user.providerData[0]?.providerId,
+        token: idToken,
       });
+
+      // Store tokens for future use
+      localStorage.setItem('authToken', idToken);
     } catch (error) {
       console.error('Authentication failed:', error);
 
@@ -114,33 +140,11 @@ export default function Home() {
     }
   }
 
-  // Secondary Auth: Email/Password Authentication
-  const handleTestLogin = async () => {
-    console.log('Attempting test login...');
-    try {
-      setError(null);
-      setLoading(true);
-      const credential = await signInWithEmailAndPassword(
-        auth,
-        'test@example.com',
-        'testpassword123'
-      );
-      console.log('Test login successful:', credential.user.email);
-    } catch (error) {
-      const authError = error as AuthError;
-      console.error('Test authentication failed:', authError);
-      setError(
-        authError.message || 'Test authentication failed. Please try again.'
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleLogout = async () => {
     try {
       await signOut(auth);
       localStorage.removeItem('authToken');
+      localStorage.removeItem('googleAccessToken');
       setTokenDebug('');
       console.log('Logged out successfully');
     } catch (error) {
@@ -201,11 +205,11 @@ export default function Home() {
         <div className="border-t pt-6">
           <div className="flex justify-center space-x-4">
             <button
-              onClick={handleTestLogin}
+              onClick={handleGoogleSignIn}
               className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition disabled:opacity-50"
               disabled={!!user}
             >
-              Test Login
+              Sign in with Google
             </button>
             <button
               onClick={handleLogout}
