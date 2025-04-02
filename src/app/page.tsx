@@ -75,7 +75,11 @@ export default function Home() {
       }
 
       // Create Google credential with ID token
-      const credential = GoogleAuthProvider.credential(token);
+      // Note that this is a Google ID token, not a Firebase ID token
+      const credential = GoogleAuthProvider.credential(null, token); // For Google token
+      // OR if you specifically need to use an ID token:
+      // const credential = GoogleAuthProvider.credential(token);
+
       const result = await signInWithCredential(auth, credential);
       console.log('Authentication successful:', {
         email: result.user.email,
@@ -168,13 +172,6 @@ export default function Home() {
             <div className="space-y-4">
               <div className="p-4 bg-green-100 rounded-lg">
                 <div className="flex items-center justify-center gap-3">
-                  {user.photoURL && (
-                    <img
-                      src={user.photoURL}
-                      alt="Profile"
-                      className="w-10 h-10 rounded-full"
-                    />
-                  )}
                   <div className="text-left">
                     {user.displayName && (
                       <p className="font-medium text-green-700">
