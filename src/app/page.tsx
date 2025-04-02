@@ -222,7 +222,7 @@ export default function Home() {
             <button
               onClick={handleLogout}
               className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition disabled:opacity-50"
-              disabled={!user}
+              // disabled={!user}
               id="logout-button"
               aria-label="Logout"
             >
