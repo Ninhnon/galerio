@@ -7,7 +7,7 @@ import {
   signOut,
   AuthError,
   signInWithPopup,
-  signInWithCustomToken,
+  signInWithCredential,
   GoogleAuthProvider,
 } from 'firebase/auth';
 import { auth } from './firebase';
@@ -93,8 +93,23 @@ export default function Home() {
         throw new Error('No authentication token provided');
       }
 
-      // Sign in with custom token from Firebase
-      const result = await signInWithCustomToken(auth, token);
+      // First attempt to parse and validate the token
+      const tokenParts = token.split('.');
+      if (tokenParts.length !== 3) {
+        throw new Error('Invalid token format');
+      }
+
+      const payload = JSON.parse(atob(tokenParts[1]));
+      if (
+        !payload.aud ||
+        payload.aud !== process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID
+      ) {
+        throw new Error('Invalid token audience');
+      }
+
+      // Create credential with the ID token
+      const credential = GoogleAuthProvider.credential(null, token);
+      const result = await signInWithCredential(auth, credential);
 
       console.log('Authentication successful:', {
         uid: result.user.uid,
