@@ -7,7 +7,7 @@ import {
   signOut,
   AuthError,
   signInWithPopup,
-  signInWithCredential,
+  signInWithCustomToken,
   GoogleAuthProvider,
 } from 'firebase/auth';
 import { auth } from './firebase';
@@ -83,35 +83,29 @@ export default function Home() {
   };
 
   // Primary Auth: Token Authentication Function
-  async function authenticateWithToken(idToken: string) {
+  async function authenticateWithToken(token: string) {
     try {
       setError(null);
       console.log('Starting authentication process...');
-      setTokenDebug(idToken);
+      setTokenDebug(token);
 
-      if (!idToken) {
+      if (!token) {
         throw new Error('No authentication token provided');
       }
 
-      const accessToken = localStorage.getItem('googleAccessToken');
-      if (!accessToken) {
-        throw new Error('No access token provided');
-      }
-
-      // Create credential with both tokens
-      const credential = GoogleAuthProvider.credential(idToken, accessToken);
-      const result = await signInWithCredential(auth, credential);
+      // Sign in with custom token from Firebase
+      const result = await signInWithCustomToken(auth, token);
 
       console.log('Authentication successful:', {
         uid: result.user.uid,
         email: result.user.email,
         name: result.user.displayName,
         provider: result.user.providerData[0]?.providerId,
-        token: idToken,
+        token: token,
       });
 
       // Store tokens for future use
-      localStorage.setItem('authToken', idToken);
+      localStorage.setItem('authToken', token);
     } catch (error) {
       console.error('Authentication failed:', error);
 
@@ -144,7 +138,6 @@ export default function Home() {
     try {
       await signOut(auth);
       localStorage.removeItem('authToken');
-      localStorage.removeItem('googleAccessToken');
       setTokenDebug('');
       console.log('Logged out successfully');
     } catch (error) {
