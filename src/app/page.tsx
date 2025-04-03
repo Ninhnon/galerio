@@ -93,22 +93,16 @@ export default function Home() {
         throw new Error('No authentication token provided');
       }
 
-      // First attempt to parse and validate the token
-      const tokenParts = token.split('.');
-      if (tokenParts.length !== 3) {
-        throw new Error('Invalid token format');
+      // Get both tokens
+      const idToken = token; // The token passed in is the ID token
+      const accessToken = localStorage.getItem('googleAccessToken');
+
+      if (!accessToken) {
+        throw new Error('Missing Google access token');
       }
 
-      const payload = JSON.parse(atob(tokenParts[1]));
-      if (
-        !payload.aud ||
-        payload.aud !== process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID
-      ) {
-        throw new Error('Invalid token audience');
-      }
-
-      // Create credential with the ID token
-      const credential = GoogleAuthProvider.credential(null, token);
+      // Create the credential with both tokens
+      const credential = GoogleAuthProvider.credential(idToken, accessToken);
       const result = await signInWithCredential(auth, credential);
 
       console.log('Authentication successful:', {
