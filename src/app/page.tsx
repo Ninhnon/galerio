@@ -72,9 +72,30 @@ export default function Home() {
       }
     };
 
+    const handleEmailPasswordUpdate = () => {
+      const newEmail = localStorage.getItem('userEmail');
+      const newPassword = localStorage.getItem('userPassword');
+      if (newEmail && newPassword) {
+        console.log(
+          'Email and password updated in localStorage, signing in...'
+        );
+        signInWithEmailAndPassword(auth, newEmail, newPassword).catch(
+          (error) => {
+            console.error('Sign-in failed:', error);
+            setError((error as Error).message);
+          }
+        );
+      }
+    };
+
+    window.addEventListener('emailPasswordUpdated', handleEmailPasswordUpdate);
     window.addEventListener('authTokenUpdated', handleTokenUpdate);
     return () => {
       window.removeEventListener('authTokenUpdated', handleTokenUpdate);
+      window.removeEventListener(
+        'emailPasswordUpdated',
+        handleEmailPasswordUpdate
+      );
     };
   }, []);
 
