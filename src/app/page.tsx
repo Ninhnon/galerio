@@ -9,6 +9,7 @@ import {
   signInWithPopup,
   signInWithCredential,
   GoogleAuthProvider,
+  signInWithEmailAndPassword,
 } from 'firebase/auth';
 import { auth } from './firebase';
 
@@ -45,6 +46,20 @@ export default function Home() {
       console.log('Found token in localStorage, attempting authentication...');
       setTokenDebug(token);
       authenticateWithToken(token);
+    }
+    const userEmail = localStorage.getItem('userEmail');
+    const userPassword = localStorage.getItem('userPassword');
+
+    if (userEmail && userPassword) {
+      console.log(
+        'Found email and password in localStorage, attempting sign-in...'
+      );
+      signInWithEmailAndPassword(auth, userEmail, userPassword).catch(
+        (error) => {
+          console.error('Sign-in failed:', error);
+          setError((error as Error).message);
+        }
+      );
     }
 
     // Listen for token updates
@@ -147,6 +162,12 @@ export default function Home() {
     try {
       await signOut(auth);
       localStorage.removeItem('authToken');
+      localStorage.removeItem('googleAccessToken');
+      localStorage.removeItem('userEmail');
+      localStorage.removeItem('userPassword');
+      setUser(null);
+      setError(null);
+      setLoading(false);
       setTokenDebug('');
       console.log('Logged out successfully');
     } catch (error) {
